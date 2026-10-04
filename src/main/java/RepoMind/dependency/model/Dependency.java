@@ -1,6 +1,7 @@
 package RepoMind.dependency.model;
 
 
+import RepoMind.repository.model.Repository;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,6 +17,9 @@ public class Dependency {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id" , nullable = false)
+    private Repository repository;
+
+    @Column(nullable = false)
     private String name;
 
     private String version;
@@ -23,7 +27,7 @@ public class Dependency {
     private String packageManager;
 
     private Boolean directDependency;
-    private Boolean oudated;
+    private Boolean outdated;
     private Boolean vulnerable;
 
     private String scope;

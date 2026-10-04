@@ -21,6 +21,10 @@ public class RepositoryAnalysis {
     @JoinColumn(name = "repository_id", nullable = false)
     private Repository repository;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AnalysisStatus status;
+
     private LocalDateTime startedAt;
     private LocalDateTime completedAt;
 

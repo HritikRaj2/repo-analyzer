@@ -5,7 +5,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/repomind
     username: postgres
-    password: ${DB_PASSWORD}
+    password: pass
     driver-class-name: org.postgresql.Driver
 
   jpa:
