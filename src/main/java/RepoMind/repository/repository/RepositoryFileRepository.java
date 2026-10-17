@@ -10,4 +10,5 @@ public interface RepositoryFileRepository extends JpaRepository<RepositoryFile, 
     List<RepositoryFile> findByRepository(Repository repository);
     List<RepositoryFile> findByRepository(Long repositoryId);
     long countByRepositoryId(Long repositoryId);
+    void deleteByRepositoryId(Long repositoryId);
 }
