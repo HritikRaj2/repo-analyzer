@@ -32,4 +32,6 @@ public class Dependency {
 
     private String scope;
 
+    @Column(name = "manifest_path")
+    private String manifestPath;
 }

@@ -6,6 +6,7 @@ import RepoMind.repository.model.Repository;
 import RepoMind.repository.service.RepositoryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import RepoMind.repository.dto.RepositoryContentAnalysisResponse;
 
 @RestController
 @RequestMapping("/api/repositories")
@@ -33,4 +34,26 @@ public class RepositoryController {
                 repositoryService.analyzeRepositoryFiles(repositoryId)
         );
     }
+
+
+    @PostMapping("/{repositoryId}/content-analysis")
+    public ResponseEntity<RepositoryContentAnalysisResponse> analyzeRepositoryContent(
+            @PathVariable Long repositoryId,
+            @RequestParam(required = false) Integer batchSize,
+            @RequestParam(required = false) Integer maxBatches
+    ) {
+        return ResponseEntity.ok(
+                repositoryService.analyzeRepositoryContent(repositoryId, batchSize, maxBatches)
+        );
+    }
+
+    @GetMapping("/{repositoryId}/content-analysis/status")
+    public ResponseEntity<RepositoryContentAnalysisResponse> getContentAnalysisStatus(
+            @PathVariable Long repositoryId
+    ) {
+        return ResponseEntity.ok(
+                repositoryService.getContentAnalysisStatus(repositoryId)
+        );
+    }
+
 }

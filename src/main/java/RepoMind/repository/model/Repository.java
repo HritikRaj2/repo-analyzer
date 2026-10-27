@@ -21,6 +21,9 @@ public class Repository {
     @Column(name = "github_id" , nullable = false , unique = true)
     private String githubId;
 
+    @Column(name = "original_url")
+    private String originalUrl;
+
     @Column(nullable = false)
     private String name;
 

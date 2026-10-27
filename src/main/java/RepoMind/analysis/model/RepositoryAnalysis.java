@@ -17,7 +17,7 @@ public class RepositoryAnalysis {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch =  FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "repository_id", nullable = false)
     private Repository repository;
 
@@ -39,6 +39,24 @@ public class RepositoryAnalysis {
 
     private Integer contributors;
     private Integer commits;
+
+    @Column(name = "health_score")
+    private Double healthScore;
+
+    @Column(name = "health_confidence")
+    private String healthConfidence;
+
+    @Column(name = "health_grade")
+    private String healthGrade;
+
+    @Column(name = "dependency_count")
+    private Integer dependencyCount;
+
+    @Column(name = "metrics_json", columnDefinition = "TEXT")
+    private String metricsJson;
+
+    @Column(name = "findings_json", columnDefinition = "TEXT")
+    private String findingsJson;
 
     private String errorMessage;
 }

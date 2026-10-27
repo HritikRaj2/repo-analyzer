@@ -5,7 +5,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/repomind
     username: postgres
-    password: pass
+    password: ${POSTGRES_PASSWORD:}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -25,3 +25,18 @@ management:
     web:
       exposure:
         include: health,info
+
+github:
+  # Optional GitHub Personal Access Token.
+  # Set the GITHUB_TOKEN environment variable — do NOT hardcode a real token here.
+  # Without a token, the GitHub API allows only 60 requests per hour per IP.
+  # With a token, the limit rises to 5000 requests per hour.
+  token: ${GITHUB_TOKEN:}
+  # HTTP connection timeout in milliseconds (default: 5 seconds).
+  connect-timeout-ms: ${GITHUB_CONNECT_TIMEOUT_MS:5000}
+  # HTTP read/response timeout in milliseconds (default: 15 seconds).
+  read-timeout-ms: ${GITHUB_READ_TIMEOUT_MS:15000}
+  # Maximum size in bytes of a source file that will be fetched for line counting.
+  max-file-size-bytes: ${GITHUB_MAX_FILE_SIZE_BYTES:1000000}
+  # Number of files to process per content-analysis call.
+  content-analysis-batch-size: ${GITHUB_BATCH_SIZE:50}
