@@ -19,7 +19,7 @@ public class RepositoryFile {
     @JoinColumn(name = "repository_id", nullable = false)
     private Repository repository;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String path;
 
     private String fileName;

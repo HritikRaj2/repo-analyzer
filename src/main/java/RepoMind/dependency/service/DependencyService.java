@@ -43,6 +43,7 @@ public class DependencyService {
     private final GitHubClient gitHubClient;
     private final List<DependencyParser> parsers;
     private final TransactionTemplate transactionTemplate;
+    private final RepoMind.repository.service.RepositoryService repositoryService;
 
     public DependencyService(
             RepositoryRepository repositoryRepository,
@@ -50,7 +51,8 @@ public class DependencyService {
             DependencyRepository dependencyRepository,
             GitHubClient gitHubClient,
             List<DependencyParser> parsers,
-            PlatformTransactionManager transactionManager
+            PlatformTransactionManager transactionManager,
+            @org.springframework.context.annotation.Lazy RepoMind.repository.service.RepositoryService repositoryService
     ) {
         this.repositoryRepository = repositoryRepository;
         this.repositoryFileRepository = repositoryFileRepository;
@@ -58,6 +60,7 @@ public class DependencyService {
         this.gitHubClient = gitHubClient;
         this.parsers = parsers;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.repositoryService = repositoryService;
     }
 
     /**
@@ -76,6 +79,15 @@ public class DependencyService {
                 .orElseThrow(() -> new IllegalArgumentException("Repository not found with ID: " + repositoryId));
 
         List<RepositoryFile> allFiles = repositoryFileRepository.findByRepositoryId(repositoryId);
+        if (allFiles.isEmpty()) {
+            try {
+                repositoryService.analyzeRepositoryFiles(repositoryId);
+                allFiles = repositoryFileRepository.findByRepositoryId(repositoryId);
+            } catch (Exception ex) {
+                log.warn("Auto-syncing files during dependency analysis failed: {}", ex.getMessage());
+            }
+        }
+
         if (allFiles.isEmpty()) {
             throw new IllegalStateException("Repository file inventory is empty. Please run file analysis first.");
         }

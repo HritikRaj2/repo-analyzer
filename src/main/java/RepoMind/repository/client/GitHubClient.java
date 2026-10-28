@@ -41,8 +41,9 @@ public class GitHubClient {
 
     public GitHubClient(GitHubProperties props) {
 
-        // Build a shared HttpClient with connection and read timeouts.
+        // Build a shared HttpClient with connection and read timeouts and redirect following.
         HttpClient httpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
                 .connectTimeout(Duration.ofMillis(props.getConnectTimeoutMs()))
                 .build();
 
@@ -55,7 +56,8 @@ public class GitHubClient {
                 .requestFactory(httpClientFactory)
                 .baseUrl("https://api.github.com")
                 .defaultHeader("Accept", "application/vnd.github+json")
-                .defaultHeader("X-GitHub-Api-Version", "2022-11-28");
+                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+                .defaultHeader("User-Agent", "RepoMind-Analyzer");
 
         if (props.hasToken()) {
             apiBuilder.defaultHeader("Authorization", "Bearer " + props.getToken());
@@ -65,7 +67,8 @@ public class GitHubClient {
 
         // ---- Raw content client (raw.githubusercontent.com) ----
         RestClient.Builder rawBuilder = RestClient.builder()
-                .requestFactory(httpClientFactory);
+                .requestFactory(httpClientFactory)
+                .defaultHeader("User-Agent", "RepoMind-Analyzer");
 
         if (props.hasToken()) {
             rawBuilder.defaultHeader("Authorization", "Bearer " + props.getToken());

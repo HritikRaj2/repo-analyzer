@@ -25,6 +25,8 @@ import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service managing the lifecycle, metric calculation, scoring, and persistence
@@ -41,18 +43,25 @@ public class RepositoryHealthService {
     private final RepositoryAnalysisRepository repositoryAnalysisRepository;
     private final HealthScoreCalculator healthScoreCalculator;
 
+    private final DependencyService dependencyService;
+
+    // In-memory cache keyed by analysis ID to prevent re-querying thousands of file records on every read poll
+    private final Map<Long, CalculationResult> analysisCache = new ConcurrentHashMap<>();
+
     public RepositoryHealthService(
             RepositoryRepository repositoryRepository,
             RepositoryFileRepository repositoryFileRepository,
             DependencyRepository dependencyRepository,
             RepositoryAnalysisRepository repositoryAnalysisRepository,
-            HealthScoreCalculator healthScoreCalculator
+            HealthScoreCalculator healthScoreCalculator,
+            @org.springframework.context.annotation.Lazy DependencyService dependencyService
     ) {
         this.repositoryRepository = repositoryRepository;
         this.repositoryFileRepository = repositoryFileRepository;
         this.dependencyRepository = dependencyRepository;
         this.repositoryAnalysisRepository = repositoryAnalysisRepository;
         this.healthScoreCalculator = healthScoreCalculator;
+        this.dependencyService = dependencyService;
     }
 
     /**
@@ -79,6 +88,16 @@ public class RepositoryHealthService {
             // 3. Load persisted inventory and dependency records
             List<RepositoryFile> files = repositoryFileRepository.findByRepositoryId(repositoryId);
             List<Dependency> dependencies = dependencyRepository.findByRepositoryId(repositoryId);
+
+            if (dependencies.isEmpty() && files.stream().anyMatch(f -> isManifest(f.getPath()))) {
+                try {
+                    dependencyService.analyzeDependencies(repositoryId);
+                    dependencies = dependencyRepository.findByRepositoryId(repositoryId);
+                } catch (Exception ex) {
+                    log.warn("Auto-ingesting dependencies during health analysis failed: {}", ex.getMessage());
+                }
+            }
+
             boolean dependenciesAnalyzed = !dependencies.isEmpty()
                     || (files.stream().anyMatch(f -> isManifest(f.getPath())) && dependencyRepository.countByRepositoryId(repositoryId) > 0);
 
@@ -108,6 +127,9 @@ public class RepositoryHealthService {
             analysis.setErrorMessage(null);
             analysis = repositoryAnalysisRepository.save(analysis);
 
+            // Cache the result for subsequent instant GET lookups
+            analysisCache.put(analysis.getId(), result);
+
             return toResponse(
                     analysis,
                     repository.getId(),
@@ -132,18 +154,24 @@ public class RepositoryHealthService {
 
     /**
      * Retrieves the latest analysis for a given repository.
+     * Automatically computes initial health analysis or refreshes stale 0-file analyses if files now exist.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public RepositoryHealthAnalysisResponse getLatestAnalysis(Long repositoryId) {
         if (!repositoryRepository.existsById(repositoryId)) {
             throw new IllegalArgumentException("Repository not found with ID: " + repositoryId);
         }
 
-        RepositoryAnalysis analysis = repositoryAnalysisRepository
-                .findTopByRepositoryIdOrderByStartedAtDesc(repositoryId)
-                .orElseThrow(() -> new IllegalArgumentException("No analysis found for repository ID: " + repositoryId));
+        var analysisOpt = repositoryAnalysisRepository
+                .findTopByRepositoryIdOrderByStartedAtDesc(repositoryId);
 
-        return buildResponseFromEntity(analysis);
+        if (analysisOpt.isEmpty()
+                || (analysisOpt.get().getTotalFiles() != null && analysisOpt.get().getTotalFiles() == 0
+                    && repositoryFileRepository.countByRepositoryId(repositoryId) > 0)) {
+            return analyzeRepositoryHealth(repositoryId);
+        }
+
+        return buildResponseFromEntity(analysisOpt.get());
     }
 
     /**
@@ -181,17 +209,20 @@ public class RepositoryHealthService {
             );
         }
 
-        List<RepositoryFile> files = repositoryFileRepository.findByRepositoryId(repoId);
-        List<Dependency> dependencies = dependencyRepository.findByRepositoryId(repoId);
-        boolean dependenciesAnalyzed = !dependencies.isEmpty()
-                || (files.stream().anyMatch(f -> isManifest(f.getPath())) && dependencyRepository.countByRepositoryId(repoId) > 0);
+        final Repository finalRepo = repo;
+        CalculationResult result = analysisCache.computeIfAbsent(analysis.getId(), id -> {
+            List<RepositoryFile> files = repositoryFileRepository.findByRepositoryId(repoId);
+            List<Dependency> dependencies = dependencyRepository.findByRepositoryId(repoId);
+            boolean dependenciesAnalyzed = !dependencies.isEmpty()
+                    || (files.stream().anyMatch(f -> isManifest(f.getPath())) && dependencyRepository.countByRepositoryId(repoId) > 0);
 
-        CalculationResult result = healthScoreCalculator.calculate(
-                repo,
-                files,
-                dependencies,
-                dependenciesAnalyzed
-        );
+            return healthScoreCalculator.calculate(
+                    finalRepo,
+                    files,
+                    dependencies,
+                    dependenciesAnalyzed
+            );
+        });
 
         return toResponse(
                 analysis,

@@ -21,7 +21,7 @@ public class Repository {
     @Column(name = "github_id" , nullable = false , unique = true)
     private String githubId;
 
-    @Column(name = "original_url")
+    @Column(name = "original_url", columnDefinition = "TEXT")
     private String originalUrl;
 
     @Column(nullable = false)
@@ -31,9 +31,11 @@ public class Repository {
     private String fullName;
 
     private String owner;
+
+    @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "html_url")
+    @Column(name = "html_url", columnDefinition = "TEXT")
     private String htmlUrl;
 
     @Column(name="default_branch")

@@ -86,27 +86,38 @@ public class RepositoryService {
         GitHubRepositoryResponse response =
                 gitHubClient.getRepository(owner, repositoryName);
 
+        if (response == null || response.id() == null) {
+            throw new GitHubClient.GitHubNotFoundException(
+                    "Repository not found or invalid metadata returned for: " + owner + "/" + repositoryName
+            );
+        }
+
         String githubId = String.valueOf(response.id());
 
         Repository repository = repositoryRepository
                 .findByGithubId(githubId)
                 .orElseGet(Repository::new);
 
-        repository.setGithubId(githubId);
-        repository.setOriginalUrl(cleanUrl);
-        repository.setName(response.name());
-        repository.setFullName(response.fullName());
-        repository.setOwner(response.owner().login());
-        repository.setDescription(response.description());
-        repository.setHtmlUrl(response.htmlUrl());
-        repository.setDefaultBranch(response.defaultBranch());
-        repository.setStars(response.stars());
-        repository.setForks(response.forks());
-        repository.setOpenIssues(response.openIssues());
-        repository.setPrimaryLanguage(response.language());
+        repository.setGithubId(safeTruncate(githubId, 255));
+        repository.setOriginalUrl(safeTruncate(cleanUrl, 255));
+        repository.setName(safeTruncate(response.name() != null ? response.name() : repositoryName, 255));
+        repository.setFullName(safeTruncate(response.fullName() != null ? response.fullName() : (owner + "/" + repositoryName), 255));
+        
+        String ownerLogin = (response.owner() != null && response.owner().login() != null)
+                ? response.owner().login()
+                : owner;
+        repository.setOwner(safeTruncate(ownerLogin, 255));
+
+        repository.setDescription(safeTruncate(response.description(), 255));
+        repository.setHtmlUrl(safeTruncate(response.htmlUrl() != null ? response.htmlUrl() : cleanUrl, 255));
+        repository.setDefaultBranch(safeTruncate(response.defaultBranch() != null ? response.defaultBranch() : "main", 255));
+        repository.setStars(response.stars() != null ? response.stars() : 0);
+        repository.setForks(response.forks() != null ? response.forks() : 0);
+        repository.setOpenIssues(response.openIssues() != null ? response.openIssues() : 0);
+        repository.setPrimaryLanguage(safeTruncate(response.language(), 255));
 
         if (response.license() != null) {
-            repository.setLicense(response.license().name());
+            repository.setLicense(safeTruncate(response.license().name(), 255));
         } else {
             repository.setLicense(null);
         }
@@ -127,7 +138,15 @@ public class RepositoryService {
                 LocalDateTime.now(ZoneOffset.UTC)
         );
 
-        return repositoryRepository.save(repository);
+        repository = repositoryRepository.save(repository);
+
+        try {
+            analyzeRepositoryFiles(repository.getId());
+        } catch (Exception ex) {
+            log.warn("Automatic file synchronization after repository metadata save failed: {}", ex.getMessage());
+        }
+
+        return repository;
     }
 
     // ==================================================
@@ -557,5 +576,12 @@ public class RepositoryService {
                 Instant.parse(timestamp),
                 ZoneOffset.UTC
         );
+    }
+
+    private String safeTruncate(String val, int maxLength) {
+        if (val == null) {
+            return null;
+        }
+        return val.length() > maxLength ? val.substring(0, maxLength) : val;
     }
 }
